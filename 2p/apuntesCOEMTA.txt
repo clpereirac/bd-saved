@@ -1,0 +1,163 @@
+1. Dada la base de datos PROVEEDORES1, escribir un procedimiento almacenado que:
+Obtenga el nombre del proveedor, el nombre del odontólogo y la cantidad mínima
+de ventas realizadas por cada odontólogo en el año 2023.
+Considere solo a aquellos odontólogos que hayan realizado al menos 3 ventas en
+el año 2023.
+Utilice la combinación de las tablas PROVEEDOR, ODONTOLOGO y VENTA.
+
+-- Seleccionar la base de datos PROVEEDORES para usarla
+USE PROVEEDORES;
+
+-- Cambiar el delimitador para definir un bloque de procedimiento
+DELIMITER //
+
+-- Crear el procedimiento almacenado llamado EJE1
+CREATE PROCEDURE EJE1()
+BEGIN
+    -- Seleccionar el nombre del proveedor, el nombre del odontólogo y la cantidad mínima de ventas realizadas
+    SELECT P.NOMBRE AS 'NOMBRE PROVEEDOR',           -- Selecciona el nombre del proveedor y lo etiqueta como 'NOMBRE PROVEEDOR'
+           O.NOMBREODO AS 'NOMBRE ODONTOLOGO',       -- Selecciona el nombre del odontólogo y lo etiqueta como 'NOMBRE ODONTOLOGO'
+           MIN(V.CANTIDADV) AS 'CANTIDAD MINIMA'     -- Selecciona la cantidad mínima de ventas y la etiqueta como 'CANTIDAD MINIMA'
+    FROM PROVEEDOR P                                 -- Tabla PROVEEDOR con alias P
+    INNER JOIN ODONTOLOGO O ON P.IDEP = O.IDEP       -- Unión interna con la tabla ODONTOLOGO usando IDEP como llave foránea
+    INNER JOIN VENTA V ON V.CODO = O.CODO            -- Unión interna con la tabla VENTA usando CODO como llave foránea
+    WHERE YEAR(V.FECHAV) = 2023                      -- Filtrar las ventas realizadas en el año 2023
+    GROUP BY O.CODO                                  -- Agrupar los resultados por el código del odontólogo
+    HAVING COUNT(*) >= 3;                            -- Filtrar los grupos que tienen al menos 3 ventas
+END //
+
+-- Restablecer el delimitador al punto y coma
+DELIMITER ;
+
+-- Llamar al procedimiento almacenado EJE1 para ejecutar la consulta
+CALL EJE1();
+
+porque unes proveedor con odontologoco con sus codigos idep y porque unes venta con odontologo con el codo?
+
+Dada la base de datos PROVEEDORES1, escribir un procedimiento almacenado que:
+Reciba como parámetro DE ENTRADA la descripción de un material.
+Verifique si el material existe en la tabla MATERIAL.
+Si el material existe, verifique si hay entregas registradas de ese material en la tabla ENTREGA.
+Si existen entregas, muestre el nombre de los odontólogos y la cantidad total entregada de ese material a cada odontólogo.
+Si no existen entregas del material, indique que no hay entregas registradas de ese material.
+Si el material no está registrado en la base de datos, indique que el material no está registrado.
+
+USE PROVEEDORES;
+
+-- PREGUNTA2
+
+DELIMITER $$
+-- recibe un parámetro de entrada DES de tipo VARCHAR(35)
+CREATE PROCEDURE EJE2(IN DES VARCHAR(35))
+BEGIN
+    -- Declarar la variable CODM de tipo CHAR(6)
+    DECLARE CODM CHAR(6);
+    
+    -- Verificar si existe un material con la descripción proporcionada (DES)
+    IF EXISTS (SELECT * FROM MATERIAL WHERE DESCRIPCION = DES) THEN
+        -- Asignar a la variable CODM el código del material que coincide con la descripción
+        SET CODM = (SELECT CODIGO FROM MATERIAL WHERE DESCRIPCION = DES);
+        
+        -- Verificar si existen registros de entrega para el material con el código CODM
+        IF EXISTS (SELECT * FROM ENTREGA WHERE CODIGO = CODM) THEN
+            -- Seleccionar el nombre de los odontólogos y la cantidad total entregada de ese material
+            SELECT O.NOMBREODO AS 'ODONTOLOGO',
+                   SUM(E.CANTIDADE) AS 'CANTIDAD TOTAL'
+            -- Realizar una unión interna entre ODONTOLOGO y ENTREGA para obtener la información deseada
+            FROM ODONTOLOGO O INNER JOIN ENTREGA E ON E.CODO = O.CODO 
+            -- Filtrar los registros por el código del material
+            WHERE E.CODIGO = CODM
+            -- Agrupar los resultados por el nombre del odontólogo
+            GROUP BY O.NOMBREODO;
+        ELSE
+            -- Si no existen entregas del material, mostrar un mensaje indicando tal situación
+            SELECT 'NO EXISTE ENTREGAS DEL MATERIAL';
+        END IF;
+    ELSE
+        -- Si el material no está registrado en la base de datos, mostrar un mensaje indicando tal situación
+        SELECT 'MATERIAL NO REGISTRADO' AS MENSAJE;
+    END IF;
+END $$
+DELIMITER ;
+CALL EJE2('TIJERA CURVA');
+
+
+Escribir un procedimiento almacenado que:
+Dado el nombre de un odontólogo(PARAMETRO POR ENTRADA), determine el código del odontólogo.
+Si el odontólogo está registrado, calcule la cantidad total de ventas (CTMV)(PARAMETRO POR SALIDA)
+y la cantidad total de entregas (CTME)(PARAMETRO POR SALIDA) realizadas por ese odontólogo.
+Si el odontólogo no está registrado, devuelva un mensaje indicando "ODONTOLOGO NO REGISTRADO".
+Si el odontólogo está registrado pero no tiene ninguna venta, devuelva un mensaje indicando "NO EXISTE NINGUNA VENTA CON EL ODONTOLOGO".
+
+DELIMITER //
+-- parámetro de entrada y dos parámetros de salida
+CREATE PROCEDURE EJE3(IN NODONTO VARCHAR(35), OUT CTMV INT, OUT CTME INT)
+BEGIN
+    -- Declara una variable local COD1 de tipo CHAR(6) para almacenar el código del odontólogo
+    DECLARE COD1 CHAR(6);
+
+    -- Verifica si existe un odontólogo con el nombre proporcionado
+    IF EXISTS (SELECT * FROM ODONTOLOGO WHERE NOMBREODO = NODONTO) THEN
+        -- Si el odontólogo existe, obtiene su código y lo asigna a la variable COD1
+        SET COD1 = (SELECT CODO FROM ODONTOLOGO WHERE NOMBREODO = NODONTO);
+
+        -- Verifica si existen ventas asociadas con el código del odontólogo
+        IF EXISTS(SELECT * FROM VENTA WHERE CODO = COD1) THEN
+            -- Si existen ventas, calcula la cantidad total de ventas y la asigna a CTMV
+            SELECT SUM(CANTIDADV) INTO CTMV FROM VENTA WHERE CODO = COD1;
+
+            -- Calcula la cantidad total de entregas y la asigna a CTME
+            SELECT SUM(CANTIDADE) INTO CTME FROM ENTREGA WHERE CODO = COD1;
+        ELSE
+            -- Si no existen ventas, devuelve un mensaje indicando que no hay ventas para ese odontólogo
+            SELECT 'NO EXISTE NINGUNA VENTA CON EL ODONTOLOGO';
+        END IF;
+    ELSE
+        -- Si el odontólogo no está registrado, devuelve un mensaje indicando que no está registrado
+        SELECT 'ODONTOLOGO NO REGISTRADO' AS MENSAJE;
+    END IF;
+END //
+DELIMITER ;
+
+-- Llama al procedimiento almacenado EJE3 con el nombre 'MAURICIO VENTURA', y guarda los resultados en las variables @CVENTA y @CENTREGA
+CALL EJE3('MAURICIO VENTURA', @CVENTA, @CENTREGA);
+
+-- Selecciona y muestra las cantidades totales de ventas y entregas usando las variables de salida
+SELECT @CVENTA AS 'CANTIDAD TOTAL DE VENTA', @CENTREGA AS 'CANTIDAD TOTAL ENTREGADA';
+
+EN QUE SE DIFERENCIA UNA FUNCION DE UN PROCEDURE?
+
+
+Dada la base de datos PROVEEDORES1, escribir una FUNCION almacenada que:
+Tome como parámetros el nombre de un odontólogo y una fecha específica.
+Y RETORNE devuelva el número de ventas realizadas por ese odontólogo en la fecha especificada.
+
+DELIMITER //
+
+--  recibe el nombre de un odontólogo y una fecha, y devuelve un entero
+CREATE FUNCTION FUN4(N1 VARCHAR(35), F1 DATE) RETURNS INT
+READS SQL DATA -- Indica que la función solo lee datos, no los modifica
+DETERMINISTIC -- Indica que la función siempre devuelve el mismo resultado para los mismos parámetros
+BEGIN
+    -- Declarar una variable COD1 de tipo CHAR(6) para almacenar el código del odontólogo
+    DECLARE COD1 CHAR(6);
+
+    -- Declarar una variable NV de tipo INT para almacenar el número de ventas
+    DECLARE NV INT;
+
+    -- Asignar a COD1 el código del odontólogo cuyo nombre es N1
+    SET COD1 = (SELECT CODO FROM ODONTOLOGO WHERE NOMBREODO = N1);
+
+    -- Contar el número de ventas realizadas con código COD1 en la fecha F1 y asignarlo a NV
+    SELECT COUNT(CODO) INTO NV FROM VENTA WHERE CODO = COD1 AND DATE(FECHAV) = F1;
+
+    -- Devolver el número de ventas
+    RETURN NV;
+END //
+-- Cambiar el delimitador de vuelta a punto y coma
+DELIMITER ;
+
+-- Llamar a la función FUN4 con el nombre 'MAURICIO VENTURA' y la fecha '2023-11-10', y mostrar el resultado como 'NUMERO DE VENTAS'
+SELECT FUN4('MAURICIO VENTURA', '2023-11-10') AS 'NUMERO DE VENTAS';
+
+porque aqui 
